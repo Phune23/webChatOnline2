@@ -1,7 +1,3 @@
-Dưới đây là phiên bản tiếng Anh của file Markdown mà bạn cung cấp. Nội dung được dịch một cách tự nhiên, chuyên nghiệp và giữ nguyên cấu trúc ấn tượng:
-
----
-
 # 🌐 **Web Chat Online 2 - Connecting Every Distance**
 
 ## 🚀 **Project Introduction**
