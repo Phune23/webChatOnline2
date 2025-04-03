@@ -3,34 +3,19 @@
  * Handles all authentication-related endpoints
  */
 const express = require('express');
-const router = express.Router();
-const authController = require('../controllers/auth.controller');
+const { register, login, logout, getMe } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
+const validate = require('../middleware/validation.middleware');
+const { registerSchema, loginSchema } = require('../validations/auth.validation');
 
-/**
- * @route   POST /api/auth/register
- * @desc    Register a new user
- * @access  Public
- * @body    {username, email, password}
- * @returns User object with JWT token
- */
-router.post('/register', authController.register);
+const router = express.Router();
 
-/**
- * @route   POST /api/auth/login
- * @desc    Authenticate user & get token
- * @access  Public
- * @body    {email, password}
- * @returns User object with JWT token
- */
-router.post('/login', authController.login);
+// Public routes
+router.post('/register', validate(registerSchema), register);
+router.post('/login', validate(loginSchema), login);
 
-/**
- * @route   POST /api/auth/logout
- * @desc    Logout user & clear cookie
- * @access  Private
- * @returns Success message
- */
-router.post('/logout', protect, authController.logout);
+// Protected routes
+router.post('/logout', protect, logout);
+router.get('/me', protect, getMe);
 
 module.exports = router;
