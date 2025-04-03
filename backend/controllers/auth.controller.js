@@ -1,134 +1,104 @@
-const User = require('../models/user.model');
-const jwt = require('jsonwebtoken');
+const authService = require('../services/auth.service');
+const jwtConfig = require('../config/jwt.config');
 
-// Tạo token JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d'
+/**
+ * @desc    Đăng ký người dùng mới
+ * @route   POST /api/auth/register
+ * @access  Public
+ */
+const register = async (req, res, next) => {
+  try {
+    const { username, email, password } = req.body;
+    
+    // Gọi service để đăng ký
+    const { user, token } = await authService.register({ username, email, password });
+    
+    // Lưu token vào cookie
+    setTokenCookie(res, token);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Đăng ký thành công',
+      user,
+      token,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Đăng nhập người dùng
+ * @route   POST /api/auth/login
+ * @access  Public
+ */
+const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Gọi service để đăng nhập
+    const { user, token } = await authService.login(email, password);
+    
+    // Lưu token vào cookie
+    setTokenCookie(res, token);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Đăng nhập thành công',
+      user,
+      token,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Đăng xuất người dùng
+ * @route   POST /api/auth/logout
+ * @access  Private
+ */
+const logout = async (req, res, next) => {
+  try {
+    // Gọi service để đăng xuất
+    await authService.logout(req.user._id);
+    
+    // Xóa cookie
+    res.clearCookie('token');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Đăng xuất thành công',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Lấy thông tin người dùng hiện tại
+ * @route   GET /api/auth/me
+ * @access  Private
+ */
+const getMe = async (req, res) => {
+  res.status(200).json({
+    success: true,
+    user: req.user,
   });
 };
 
-// Đăng ký người dùng
-exports.register = async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-
-    // Kiểm tra người dùng tồn tại
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
-    if (userExists) {
-      return res.status(400).json({
-        message: 'Email hoặc tên người dùng đã tồn tại'
-      });
-    }
-
-    // Tạo user mới
-    const user = await User.create({
-      username,
-      email,
-      password
-    });
-
-    // Tạo token
-    const token = generateToken(user._id);
-
-    // Gửi token trong cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
-    });
-
-    // Trả về thông tin user (không gửi password)
-    res.status(201).json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar,
-      friends: user.friends,
-      status: user.status
-    });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({
-      message: 'Đăng ký thất bại',
-      error: error.message
-    });
-  }
+/**
+ * Helper function để set JWT cookie
+ * @param {Object} res - Express response object
+ * @param {string} token - JWT token
+ */
+const setTokenCookie = (res, token) => {
+  res.cookie('token', token, jwtConfig.cookieOptions);
 };
 
-// Đăng nhập
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Tìm user theo email
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({
-        message: 'Email hoặc mật khẩu không chính xác'
-      });
-    }
-
-    // Kiểm tra mật khẩu
-    const isMatch = await user.matchPassword(password);
-    if (!isMatch) {
-      return res.status(401).json({
-        message: 'Email hoặc mật khẩu không chính xác'
-      });
-    }
-
-    // Cập nhật trạng thái online
-    user.status = 'online';
-    await user.save();
-
-    // Tạo token
-    const token = generateToken(user._id);
-
-    // Gửi token trong cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
-    });
-
-    // Trả về thông tin user
-    res.status(200).json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar,
-      friends: user.friends,
-      status: user.status
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      message: 'Đăng nhập thất bại',
-      error: error.message
-    });
-  }
-};
-
-// Đăng xuất
-exports.logout = async (req, res) => {
-  try {
-    // Cập nhật trạng thái offline
-    await User.findByIdAndUpdate(req.user._id, { status: 'offline' });
-    
-    // Xóa cookie token
-    res.cookie('token', '', {
-      httpOnly: true,
-      expires: new Date(0)
-    });
-    
-    res.status(200).json({ message: 'Đăng xuất thành công' });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      message: 'Đăng xuất thất bại',
-      error: error.message
-    });
-  }
+module.exports = {
+  register,
+  login,
+  logout,
+  getMe,
 };

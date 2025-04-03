@@ -1,28 +1,46 @@
 const jwt = require('jsonwebtoken');
+const { createError } = require('../utils/error.utils');
 const User = require('../models/user.model');
+const jwtConfig = require('../config/jwt.config');
 
-exports.protect = async (req, res, next) => {
+/**
+ * Middleware bảo vệ route, yêu cầu user đã đăng nhập
+ */
+const protect = async (req, res, next) => {
   try {
-    const token = req.cookies.token;
-    
-    if (!token) {
-      return res.status(401).json({ message: 'Không có quyền truy cập, vui lòng đăng nhập' });
+    let token;
+
+    // Kiểm tra token trong cookie hoặc header
+    if (req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    } else if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith('Bearer')
+    ) {
+      token = req.headers.authorization.split(' ')[1];
     }
 
-    // Xác thực token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Lấy thông tin user từ token
-    const user = await User.findById(decoded.id).select('-password');
-    
-    if (!user) {
-      return res.status(404).json({ message: 'Người dùng không tồn tại' });
+    if (!token) {
+      return next(createError('Vui lòng đăng nhập để truy cập', 401));
     }
-    
+
+    // Verify token
+    const decoded = jwt.verify(token, jwtConfig.secret);
+
+    // Check if user still exists
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return next(createError('Người dùng không tồn tại', 401));
+    }
+
+    // Đưa thông tin user vào request
     req.user = user;
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(401).json({ message: 'Không có quyền truy cập, token không hợp lệ' });
+    next(error);
   }
+};
+
+module.exports = {
+  protect,
 };
