@@ -1,49 +1,61 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    minlength: 3
+const userSchema = new mongoose.Schema(
+  {
+    username: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 30,
+      unique: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+      match: [/^\S+@\S+\.\S+$/, 'Vui lòng nhập email hợp lệ'],
+    },
+    password: {
+      type: String,
+      required: true,
+      minlength: 6,
+      select: false, // Không trả về password khi query
+    },
+    avatar: {
+      type: String,
+      default: '/uploads/avatars/default.png',
+    },
+    bio: {
+      type: String,
+      maxlength: 160,
+      default: '',
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+    lastActive: {
+      type: Date,
+      default: Date.now,
+    },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 6
-  },
-  avatar: {
-    type: String,
-    default: ''
-  },
-  friends: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  friendRequests: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  status: {
-    type: String,
-    enum: ['online', 'offline'],
-    default: 'offline'
+  {
+    timestamps: true,
   }
-}, { timestamps: true });
+);
 
-// Hàm mã hóa mật khẩu trước khi lưu
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
+// Hash password trước khi lưu vào DB
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) {
+    next();
+  }
+
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -53,10 +65,11 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Phương thức kiểm tra mật khẩu
-userSchema.methods.matchPassword = async function(enteredPassword) {
+// Method so sánh password
+userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
 const User = mongoose.model('User', userSchema);
+
 module.exports = User;
