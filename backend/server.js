@@ -29,6 +29,33 @@ app.use('/api/users', userRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/messages', messageRoutes);
 
+// Thêm route handler cho đường dẫn gốc
+app.get('/', (req, res) => {
+  res.json({ message: 'Chào mừng đến với API WebChat Online' });
+});
+
+// Phục vụ frontend trong môi trường production
+if (process.env.NODE_ENV === 'production') {
+  // Phục vụ các file tĩnh từ thư mục build của frontend
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  
+  // Mọi route không được xử lý sẽ trả về index.html
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+}
+
+// Middleware xử lý lỗi
+app.use((err, req, res, next) => {
+  console.error('Lỗi:', err);
+  res.status(500).json({ message: 'Lỗi server', error: err.message });
+});
+
+// Route không tìm thấy
+app.use((req, res) => {
+  res.status(404).json({ message: 'Không tìm thấy đường dẫn yêu cầu' });
+});
+
 // Create HTTP server
 const server = http.createServer(app);
 
